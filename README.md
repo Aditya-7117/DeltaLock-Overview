@@ -1,20 +1,20 @@
-# DeltaLock — LLM-Driven Signal Extraction & Hybrid Execution Engine
+# DeltaLock: LLM-Driven Signal Extraction & Hybrid Execution Engine
 
 **An automated execution system for NSE index/stock options that treats trade-signal generation as an arbitrary external input, and puts all of its engineering into converting that input into safe, disciplined, unattended execution.**
 
-> **This is a portfolio overview repository.** DeltaLock is a private, working trading system. Its source code, extraction pipeline internals, execution parameters, and risk configuration are not published here or anywhere public. This repository documents the engineering — architecture, safety design, and the problems solved — not the trading methodology, and not the origin of any specific trade idea.
+> **This is a portfolio overview repository.** DeltaLock is a private, working trading system. Its source code, extraction pipeline internals, execution parameters, and risk configuration are not published here or anywhere public. This repository documents the architecture, safety design and engineering problems solved. Trading methodology and the origin of trade ideas remain private.
 
 ---
 
 ## Project Overview
 
-DeltaLock ingests unstructured, natural-language trade alerts from an external intelligence source, converts them into validated, structured trade intents through an LLM-based extraction pipeline, and executes them through a polyglot Python + Go engine — with no human in the loop once a position is live.
+DeltaLock ingests unstructured, natural-language trade alerts from an external intelligence source, converts them into validated, structured trade intents through an LLM-based extraction pipeline, and executes them through a polyglot Python + Go engine, with no human in the loop once a position is live.
 
-The engineering thesis behind the project is deliberately narrow: **signal quality is treated as a given, not a variable.** DeltaLock does not attempt to generate or improve the underlying trade idea — that already exists, elsewhere, before the system ever sees it. What the system is entirely responsible for is everything downstream of that: can an arbitrary, unverified, natural-language directional call be safely, automatically, and consistently converted into a well-managed trade? That question — not signal research — is what this repository is about.
+The engineering thesis behind the project is deliberately narrow: **signal quality is treated as a given, not a variable.** DeltaLock does not attempt to generate or improve the underlying trade idea. That already exists before the system sees it. What the system is entirely responsible for is everything downstream of that: can an arbitrary, unverified, natural-language directional call be safely, automatically, and consistently converted into a well-managed trade? That execution problem is what this repository documents.
 
 ## Motivation
 
-Most automated-trading portfolio projects concentrate their effort on the signal: a model, an indicator, an edge. DeltaLock inverts that emphasis on purpose. It exists to test a different, and in some ways harder, engineering problem: whether a sufficiently disciplined extraction, guardrail, and execution layer can make an average-quality, uncontrolled input source tradeable — safely, unattended, and without a human validating each alert. That constraint shaped the architecture end to end: an LLM sits at the ingestion boundary specifically because the input is unstructured and adversarial-by-default (inconsistent formatting, duplicates, partial updates), and a dedicated low-latency execution path exists specifically because the *quality* of stop and exit management matters more here than in a system that already starts from a strong signal.
+Most automated-trading portfolio projects concentrate their effort on the signal: a model, an indicator, an edge. DeltaLock inverts that emphasis on purpose. It exists to test a different, and in some ways harder, engineering problem: whether a sufficiently disciplined extraction, guardrail, and execution layer can make an average-quality, uncontrolled input source tradeable while running unattended, without a human validating each alert. That constraint shaped the architecture end to end: an LLM sits at the ingestion boundary specifically because the input is unstructured and adversarial-by-default (inconsistent formatting, duplicates, partial updates), and a dedicated low-latency execution path exists specifically because the *quality* of stop and exit management matters more here than in a system that already starts from a strong signal.
 
 ## By the Numbers
 
@@ -27,7 +27,7 @@ Most automated-trading portfolio projects concentrate their effort on the signal
 | Market | NSE index and stock options, via live brokerage API integration |
 | Deployment | Docker Compose, plus native unattended Windows operation |
 
-*(Statistics describe engineering scope and testing rigor only — no strategy performance figures, such as returns, win rate, or drawdown, are published here or anywhere publicly, by design.)*
+*(Statistics describe engineering scope and testing rigour only; no strategy performance figures, such as returns, win rate, or drawdown, are published here or anywhere publicly, by design.)*
 
 ## High-Level Architecture
 
@@ -81,11 +81,11 @@ flowchart TB
 
 ## Engineering Challenges
 
-- **Turning unstructured language into a safe, structured action.** The system has no control over its input format — alerts arrive as free-form text, with duplicates, partial corrections, and inconsistent phrasing. An LLM-based extraction stage converts each message into a schema-validated trade intent, with guardrails that reject duplicate, malformed, or low-confidence signals before any execution logic ever sees them.
-- **Polyglot execution for latency-sensitive decisions.** Python owns ingestion, entry, and state — where correctness and readability matter most. A purpose-built Go service owns stop and exit management, where consistent low-latency response to tick data matters most. Splitting ownership this way avoided rewriting the whole system in a systems language while still getting the latency-sensitive path out of Python's interpreter/GC path.
-- **Crash-safe, replay-recoverable state.** Every lifecycle event is written to a durable, append-only log before it is processed. State lives in an idempotent registry, not in memory — so a mid-session crash or restart reconstructs exact trade state by replaying the log, rather than losing or duplicating a position.
+- **Turning unstructured language into a safe, structured action.** The system has no control over its input format. Alerts arrive as free-form text, with duplicates, partial corrections, and inconsistent phrasing. An LLM-based extraction stage converts each message into a schema-validated trade intent, with guardrails that reject duplicate, malformed, or low-confidence signals before any execution logic ever sees them.
+- **Polyglot execution for latency-sensitive decisions.** Python owns ingestion, entry and state, where correctness and readability matter most. A purpose-built Go service owns stop and exit management, where consistent low-latency response to tick data matters most. Splitting ownership this way avoided rewriting the whole system in a systems language while still getting the latency-sensitive path out of Python's interpreter/GC path.
+- **Crash-safe, replay-recoverable state.** Every lifecycle event is written to a durable, append-only log before it is processed. An idempotent registry persists state, and a restart rebuilds recorded trade state by replaying the log.
 - **Validating new logic without live risk.** Multiple execution variants run in parallel simulation against every live signal; only one variant is ever gated to touch real capital, and that gate is an explicit, human-controlled switch with no silent fallback in either direction.
-- **Making failures investigable, not just survivable.** A structured, persisted audit trail (with a dedicated log-explorer UI) plus a regression-test suite built directly from real production incidents — not hypothetical ones — turned every past failure into a permanent guard against its recurrence.
+- **Making failures investigable, not just survivable.** A persisted audit trail, a log-explorer UI and regression tests derived from production incidents make failures traceable and check the fixes against recurrence.
 
 ## Documentation
 
@@ -125,13 +125,13 @@ trading behaviour.
 
 ## Technology Stack
 
-**Backend** — Python 3.11+ (FastAPI, asyncio), Go (execution core), live brokerage REST/WebSocket integration
-**Signal Ingestion** — external alert-channel client, LLM-based extraction (Google Gemini)
-**ML** — LightGBM (experimental market-regime classifier, shadow/validation mode only)
-**Frontend** — React 19, TypeScript, Vite, Tailwind CSS, Zustand, Recharts
-**Persistence** — durable append-only event log for crash recovery, structured audit trail
-**Testing** — pytest — 50 modules, including incident-derived regression tests
-**Deployment** — Docker Compose, native Windows unattended launchers
+**Backend:** Python 3.11+ (FastAPI, asyncio), Go (execution core), live brokerage REST/WebSocket integration
+**Signal Ingestion:** external intelligence source, LLM-based extraction (Google Gemini)
+**ML:** LightGBM (experimental market-regime classifier, shadow/validation mode only)
+**Frontend:** React 19, TypeScript, Vite, Tailwind CSS, Zustand, Recharts
+**Persistence:** durable append-only event log for crash recovery, structured audit trail
+**Testing:** pytest, 50 modules, including incident-derived regression tests
+**Deployment:** Docker Compose, native Windows unattended launchers
 
 ## Screenshots
 
