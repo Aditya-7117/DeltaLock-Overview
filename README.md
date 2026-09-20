@@ -1,6 +1,6 @@
 # DeltaLock — LLM-Driven Signal Extraction & Hybrid Execution Engine
 
-**A solo-built automated execution system for NSE index/stock options that treats trade-signal generation as an arbitrary external input, and puts all of its engineering into converting that input into safe, disciplined, unattended execution.**
+**An automated execution system for NSE index/stock options that treats trade-signal generation as an arbitrary external input, and puts all of its engineering into converting that input into safe, disciplined, unattended execution.**
 
 > **This is a portfolio overview repository.** DeltaLock is a private, working trading system. Its source code, extraction pipeline internals, execution parameters, and risk configuration are not published here or anywhere public. This repository documents the engineering — architecture, safety design, and the problems solved — not the trading methodology, and not the origin of any specific trade idea.
 
@@ -8,7 +8,7 @@
 
 ## Project Overview
 
-DeltaLock ingests unstructured, natural-language trade alerts from an external channel (Telegram), converts them into validated, structured trade intents through an LLM-based extraction pipeline, and executes them through a polyglot Python + Go engine — with no human in the loop once a position is live.
+DeltaLock ingests unstructured, natural-language trade alerts from an external intelligence source, converts them into validated, structured trade intents through an LLM-based extraction pipeline, and executes them through a polyglot Python + Go engine — with no human in the loop once a position is live.
 
 The engineering thesis behind the project is deliberately narrow: **signal quality is treated as a given, not a variable.** DeltaLock does not attempt to generate or improve the underlying trade idea — that already exists, elsewhere, before the system ever sees it. What the system is entirely responsible for is everything downstream of that: can an arbitrary, unverified, natural-language directional call be safely, automatically, and consistently converted into a well-managed trade? That question — not signal research — is what this repository is about.
 
@@ -20,8 +20,8 @@ Most automated-trading portfolio projects concentrate their effort on the signal
 
 | Metric | Value |
 |---|---|
-| Codebase | ~48,700 lines of Python, TypeScript, and Go across 268+ files |
-| Automated tests | 32 pytest modules, including regression tests written directly from real production incidents |
+| Codebase | 444 tracked source files: 249 Python, 26 Go, 39 React/TypeScript components |
+| Automated tests | 50 pytest modules, including regression tests written directly from real production incidents |
 | Execution core | Polyglot: Python owns ingestion, entry, and state authority; Go owns latency-sensitive stop/exit management |
 | Signal source | Unstructured, natural-language trade alerts, parsed via an LLM-based extraction pipeline with validation guardrails |
 | Market | NSE index and stock options, via live brokerage API integration |
@@ -34,7 +34,7 @@ Most automated-trading portfolio projects concentrate their effort on the signal
 ```mermaid
 flowchart TB
     subgraph INGEST["Signal Ingestion"]
-        EXT["External NL Trade Alerts\n(Telegram)"] --> LLM["LLM Extraction +\nValidation Guardrails"]
+        EXT["External intelligence source\n(natural-language alerts)"] --> LLM["LLM Extraction +\nValidation Guardrails"]
         LLM --> INTENT["Structured Trade Intent"]
     end
 
@@ -87,19 +87,57 @@ flowchart TB
 - **Validating new logic without live risk.** Multiple execution variants run in parallel simulation against every live signal; only one variant is ever gated to touch real capital, and that gate is an explicit, human-controlled switch with no silent fallback in either direction.
 - **Making failures investigable, not just survivable.** A structured, persisted audit trail (with a dedicated log-explorer UI) plus a regression-test suite built directly from real production incidents — not hypothetical ones — turned every past failure into a permanent guard against its recurrence.
 
+## Documentation
+
+The engineering detail lives in `docs/`, and each document stops where the strategy begins.
+
+| Document | What is in it |
+|---|---|
+| [docs/ORDER-LIFECYCLE.md](docs/ORDER-LIFECYCLE.md) | The order-lifecycle state machine, a sequence diagram of one signal end to end, why entry and exit authority are split across two languages, and how recovery works |
+| [docs/DURABILITY.md](docs/DURABILITY.md) | The append-ahead event log, quoted from the real implementation: fsync on the write path, idempotent replay, event-id collision handling, and the partial-fill bug that shaped the API |
+| [docs/INVARIANTS.md](docs/INVARIANTS.md) | The invariants the system may never violate, reproduced from the private repository with the trading rules removed |
+| [docs/INCIDENT-2026-07-15.md](docs/INCIDENT-2026-07-15.md) | A full post-mortem of a live exit that never reached the broker. Two root causes, one of them the kind that leaves the system looking perfectly consistent while being wrong |
+| [DISCLOSURE.md](DISCLOSURE.md) | What is published here, what never will be, and the line between them |
+
+## Test suite
+
+50 pytest modules. The convention across the suite is that a failure in production ships its fix
+with a test named for the day it happened, so the same failure cannot return quietly. The
+date-suffixed modules below are all real incidents.
+
+| Module | What it asserts |
+|---|---|
+| `test_incident_2026_07_15_live_exit.py` | Both root causes of the live exit that never reached the broker. See the post-mortem |
+| `test_production_hardening_2026_07_10.py` | Each fix from a pre-live readiness audit, by constructing the exact failure state the fix targets rather than checking that the system boots |
+| `test_feed_starvation_2026_08_17.py` | That the system refuses to act on stale market data. In the original incident nothing crashed and no component was wrong, which is why it ran on a market that had stopped updating |
+| `test_durability_hardening_2026_08_17.py` | Three backstops that stop a long session degrading, including a sweep for trades left alive after a fill event was missed |
+| `test_never_short_2026_08_17.py` | That the system is structurally long-only. An uncovered sell on an index option is a naked short with unbounded loss, so this has to be impossible by construction rather than merely absent from the current call graph |
+| `test_stream_isolation_2026_08_17.py` | That the parallel execution variants never bleed into one another, and that exactly one of them can reach live capital |
+| `test_no_duplicate_initial_sl_2026_08_18.py` | That one long position can never carry two protective stops, after an incident where two went out a second apart |
+| `test_already_covered_sell_2026_08_18.py` | That holding a long is not by itself permission to sell, because the long may already be committed to a protective order that is currently working |
+| `test_tick_path_starvation_2026_09_04.py` | That state persistence cannot starve the tick path. Persisting the registry inline on the calling thread measured around 400 ms and was being called once a second per trade |
+| `test_state_roundtrip.py` | That serialisation preserves every field, so a restart cannot silently reset state that a dropped field would have reset |
+| `test_fifo_purge.py` | Retention behaviour of the local event store under a purge |
+
+The remaining modules cover the extraction pipeline, market data handling, the analytics layer
+and the strategy internals. They are not listed here, because their names alone describe
+trading behaviour.
+
 ## Technology Stack
 
 **Backend** — Python 3.11+ (FastAPI, asyncio), Go (execution core), live brokerage REST/WebSocket integration
-**Signal Ingestion** — Telegram client integration, LLM-based extraction (Google Gemini)
+**Signal Ingestion** — external alert-channel client, LLM-based extraction (Google Gemini)
 **ML** — LightGBM (experimental market-regime classifier, shadow/validation mode only)
 **Frontend** — React 19, TypeScript, Vite, Tailwind CSS, Zustand, Recharts
 **Persistence** — durable append-only event log for crash recovery, structured audit trail
-**Testing** — pytest — 32 modules, including incident-derived regression tests
+**Testing** — pytest — 50 modules, including incident-derived regression tests
 **Deployment** — Docker Compose, native Windows unattended launchers
 
 ## Screenshots
 
-*(To be added — captured from paper-mode sessions only, scrubbed of any real account, position, or P&L data. No raw signal-source content, configuration values, or code views will be shown.)*
+*(To be added, captured from paper-mode sessions only and scrubbed of any real account,
+position or profit and loss data. No raw signal content, configuration values or code views will
+be shown.)*
 
 Planned: dashboard overview (layout only), audit-log explorer UI, system status/connectivity panel, architecture diagram render, test-suite pass summary.
 
@@ -115,4 +153,4 @@ This is a documentation-only showcase. It does not include: the extraction pipel
 
 ---
 
-Built solo by Aditya Magar. Get in touch via the contact details on my resume/LinkedIn.
+Built by Aditya Magar. Get in touch via the contact details on my CV or LinkedIn.
