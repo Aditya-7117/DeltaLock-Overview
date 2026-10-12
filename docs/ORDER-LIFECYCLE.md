@@ -54,7 +54,7 @@ sequenceDiagram
     SRC->>EXT: unstructured natural-language alert
     EXT->>EXT: parse to schema, reject duplicate, malformed or low-confidence
     EXT->>REG: validated trade intent
-    REG->>REG: resolve instrument, subscribe, register three variants
+    REG->>REG: resolve instrument, subscribe, register the execution streams
     REG->>PY: arm entry
 
     Note over PY: pre-entry guards run before any order
@@ -74,7 +74,7 @@ sequenceDiagram
     GO->>BRK: exit order
     BRK-->>GO: exit fill
     GO->>REG: mark_closed(price, reason)
-    REG->>REG: unsubscribe only when all three variants have closed
+    REG->>REG: unsubscribe only when every stream has closed
 ```
 
 ## Why authority is split

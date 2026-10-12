@@ -32,6 +32,10 @@ trading behaviour rather than the system.
 - No variant may be disabled, removed or merged into another. Their isolation is what makes the
   comparison between them meaningful.
 
+The private file still says three. A fourth, paper-only stream was added on 29 June 2026 to
+forward-test a candidate replacement for the live stream, so the code at the latest commit runs
+four. The other three lines hold for all four.
+
 ## Authority
 
 - Entry decisioning exists in one place only, in the Python layer.

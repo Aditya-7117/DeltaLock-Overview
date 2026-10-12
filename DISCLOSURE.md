@@ -18,6 +18,8 @@ not published is anything that would let a reader reproduce the trading behaviou
 - The test tree: module names, counts, and what each module asserts
 - Code excerpts quoted from the private repository, chosen because they carry no strategy
 - A post-mortem of a real live-trading incident, including both root causes
+- Four safety modules with 42 of their tests, runnable in `extract/`: the never-short guard, the
+  exit price resolver, the stop-order ledger and the live-stream field selection
 
 ## Never published, here or anywhere
 
@@ -37,3 +39,8 @@ engineering and it is published.
 
 Some of this repository is therefore deliberately incomplete. Where a document stops short, it
 says so rather than leaving the gap unexplained.
+
+The extract follows the same line. Security ids, quantities, prices and trade ids are
+placeholders or illustrative values, and the execution streams carry neutral names because
+their real names describe how each one manages exits. The first two
+lines of each file list what changed.
