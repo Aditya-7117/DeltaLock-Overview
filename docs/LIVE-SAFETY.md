@@ -80,6 +80,14 @@ blip could stop the system placing a stop loss on a real long, swapping a bounde
 unbounded one. So it allows, loudly. Positions and resting orders are cached for two seconds, so
 stop trailing does not add a broker round-trip to every modification.
 
+What the wall does not check: it compares a new SELL with the long alone, and with resting SELL
+orders only when they already cover the whole long. It does not add a resting SELL that covers
+part of the long to the new one. With a long of 10 lots and a resting sell of 4, a new sell of 10
+passes the wall. Two callers deal with that case before the wall sees it. The reconciler scans
+the broker's open orders before it places a stop and adopts or defers to any resting SELL on that
+security, and the exit path cancels its own stop and verifies the cancel before it sells. The wall
+is the last check on the order path, not the only one.
+
 The guard and its 20 tests are in [`extract/`](../extract/). A wiring test in the private suite
 fails if the guard is ever removed from the broker client's order path.
 
